@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from flask import Flask, redirect, render_template, request, url_for
+
+app = Flask(__name__)
+DATA_FILE = Path("pesos.json")
+
+
+def cargar_registros() -> list[dict[str, Any]]:
+    if not DATA_FILE.exists():
+        return []
+    try:
+        return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def guardar_registros(registros: list[dict[str, Any]]) -> None:
+    DATA_FILE.write_text(
+        json.dumps(registros, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+@app.get("/")
+def inicio() -> str:
+    registros = cargar_registros()
+    return render_template("index.html", registros=registros)
+
+
+@app.post("/registrar")
+def registrar_peso():
+    nombre = request.form.get("nombre", "").strip()
+    peso_texto = request.form.get("peso", "").strip()
+    fecha = request.form.get("fecha", "").strip()
+
+    if not nombre or not peso_texto:
+        return redirect(url_for("inicio"))
+
+    try:
+        peso = float(peso_texto.replace(",", "."))
+        if peso <= 0:
+            raise ValueError("El peso debe ser mayor a cero.")
+    except ValueError:
+        return redirect(url_for("inicio"))
+
+    if not fecha:
+        fecha = datetime.now().strftime("%Y-%m-%d")
+
+    registros = cargar_registros()
+    registros.append(
+        {
+            "nombre": nombre,
+            "peso": peso,
+            "fecha": fecha,
+        }
+    )
+    guardar_registros(registros)
+    return redirect(url_for("inicio"))
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
