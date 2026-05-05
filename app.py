@@ -7,61 +7,121 @@ from pathlib import Path
 from typing import Any
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 BASE_DIR = Path(__file__).resolve().parent
-DATA_FILE = Path(os.getenv("DATA_FILE", BASE_DIR / "registros_peso.txt"))
-LEGACY_JSON_FILE = BASE_DIR / "pesos.json"
+LEGACY_TXT_FILE = BASE_DIR / "registros_peso.txt"
 
 
-def cargar_registros() -> list[dict[str, Any]]:
-    if not DATA_FILE.exists() and LEGACY_JSON_FILE.exists():
-        # Migra datos del formato anterior (JSON completo) al nuevo TXT (JSONL).
-        try:
-            legacy = json.loads(LEGACY_JSON_FILE.read_text(encoding="utf-8"))
-            if isinstance(legacy, list):
-                guardar_registros(legacy)
-                return legacy
-        except (json.JSONDecodeError, OSError):
-            return []
+def get_db_connection():
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL no esta configurada. Configurala con tu cadena de Supabase o Neon."
+        )
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
 
-    if not DATA_FILE.exists():
-        return []
+
+def inicializar_db() -> None:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS registros_peso (
+                    id SERIAL PRIMARY KEY,
+                    nombre TEXT NOT NULL,
+                    peso NUMERIC(6, 2) NOT NULL,
+                    fecha DATE NOT NULL,
+                    creado_en TIMESTAMP NOT NULL DEFAULT NOW()
+                );
+                """
+            )
+    migrar_txt_legacy_si_hace_falta()
+
+
+def migrar_txt_legacy_si_hace_falta() -> None:
+    if not LEGACY_TXT_FILE.exists():
+        return
 
     try:
-        registros: list[dict[str, Any]] = []
-        for linea in DATA_FILE.read_text(encoding="utf-8").splitlines():
+        legacy_registros = []
+        for linea in LEGACY_TXT_FILE.read_text(encoding="utf-8").splitlines():
             if not linea.strip():
                 continue
             registro = json.loads(linea)
             if isinstance(registro, dict):
-                registros.append(registro)
-        return registros
-    except (json.JSONDecodeError, OSError, TypeError):
-        return []
+                legacy_registros.append(registro)
+    except (OSError, json.JSONDecodeError):
+        return
+
+    if not legacy_registros:
+        return
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM registros_peso")
+            if cur.fetchone()[0] > 0:
+                return
+
+            for registro in legacy_registros:
+                nombre = str(registro.get("nombre", "")).strip()
+                fecha = str(registro.get("fecha", "")).strip()
+                if not nombre or not fecha:
+                    continue
+                try:
+                    peso = float(registro.get("peso"))
+                except (TypeError, ValueError):
+                    continue
+                cur.execute(
+                    """
+                    INSERT INTO registros_peso (nombre, peso, fecha)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (nombre, peso, fecha),
+                )
 
 
-def guardar_registros(registros: list[dict[str, Any]]) -> None:
-    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    contenido = "\n".join(
-        json.dumps(registro, ensure_ascii=False) for registro in registros
-    )
-    DATA_FILE.write_text(f"{contenido}\n" if contenido else "", encoding="utf-8")
+def cargar_registros(nombre: str | None = None) -> list[dict[str, Any]]:
+    if nombre:
+        query = """
+            SELECT nombre, peso::float8 AS peso, fecha::text AS fecha
+            FROM registros_peso
+            WHERE LOWER(nombre) = LOWER(%s)
+            ORDER BY fecha DESC, id DESC
+        """
+        params: tuple[Any, ...] = (nombre,)
+    else:
+        query = """
+            SELECT nombre, peso::float8 AS peso, fecha::text AS fecha
+            FROM registros_peso
+            ORDER BY fecha DESC, id DESC
+        """
+        params = ()
+
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            return [dict(row) for row in cur.fetchall()]
+
+
+def guardar_registro(nombre: str, peso: float, fecha: str) -> None:
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO registros_peso (nombre, peso, fecha)
+                VALUES (%s, %s, %s)
+                """,
+                (nombre, peso, fecha),
+            )
 
 
 @app.get("/")
 def inicio() -> str:
-    registros = cargar_registros()
     nombre_busqueda = request.args.get("nombre", "").strip()
-
-    if nombre_busqueda:
-        filtrados = [
-            registro
-            for registro in registros
-            if registro.get("nombre", "").strip().lower() == nombre_busqueda.lower()
-        ]
-    else:
-        filtrados = registros
+    filtrados = cargar_registros(nombre_busqueda or None)
 
     return render_template(
         "index.html",
@@ -89,29 +149,14 @@ def registrar_peso():
     if not fecha:
         fecha = datetime.now().strftime("%Y-%m-%d")
 
-    registros = cargar_registros()
-    registros.append(
-        {
-            "nombre": nombre,
-            "peso": peso,
-            "fecha": fecha,
-        }
-    )
-    guardar_registros(registros)
+    guardar_registro(nombre, peso, fecha)
     return redirect(url_for("inicio"))
 
 
 @app.get("/api/registros")
 def api_registros():
     nombre_busqueda = request.args.get("nombre", "").strip()
-    registros = cargar_registros()
-
-    if nombre_busqueda:
-        registros = [
-            registro
-            for registro in registros
-            if registro.get("nombre", "").strip().lower() == nombre_busqueda.lower()
-        ]
+    registros = cargar_registros(nombre_busqueda or None)
 
     return jsonify(
         {
@@ -123,12 +168,7 @@ def api_registros():
 
 @app.get("/api/registros/<nombre>")
 def api_registros_por_nombre(nombre: str):
-    registros = cargar_registros()
-    filtrados = [
-        registro
-        for registro in registros
-        if registro.get("nombre", "").strip().lower() == nombre.strip().lower()
-    ]
+    filtrados = cargar_registros(nombre.strip())
     return jsonify(
         {
             "nombre": nombre,
@@ -136,6 +176,9 @@ def api_registros_por_nombre(nombre: str):
             "registros": filtrados,
         }
     )
+
+
+inicializar_db()
 
 
 if __name__ == "__main__":
