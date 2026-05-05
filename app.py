@@ -14,17 +14,16 @@ app = Flask(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 BASE_DIR = Path(__file__).resolve().parent
 LEGACY_TXT_FILE = BASE_DIR / "registros_peso.txt"
+USE_POSTGRES = bool(DATABASE_URL)
 
 
 def get_db_connection():
-    if not DATABASE_URL:
-        raise RuntimeError(
-            "DATABASE_URL no esta configurada. Configurala con tu cadena de Supabase o Neon."
-        )
     return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 
 def inicializar_db() -> None:
+    if not USE_POSTGRES:
+        return
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -42,6 +41,8 @@ def inicializar_db() -> None:
 
 
 def migrar_txt_legacy_si_hace_falta() -> None:
+    if not USE_POSTGRES:
+        return
     if not LEGACY_TXT_FILE.exists():
         return
 
@@ -84,6 +85,31 @@ def migrar_txt_legacy_si_hace_falta() -> None:
 
 
 def cargar_registros(nombre: str | None = None) -> list[dict[str, Any]]:
+    if not USE_POSTGRES:
+        try:
+            registros: list[dict[str, Any]] = []
+            if not LEGACY_TXT_FILE.exists():
+                return registros
+            for linea in LEGACY_TXT_FILE.read_text(encoding="utf-8").splitlines():
+                if not linea.strip():
+                    continue
+                registro = json.loads(linea)
+                if isinstance(registro, dict):
+                    registros.append(registro)
+            if nombre:
+                return [
+                    r
+                    for r in registros
+                    if r.get("nombre", "").strip().lower() == nombre.strip().lower()
+                ]
+            return sorted(
+                registros,
+                key=lambda r: (r.get("fecha", ""), r.get("nombre", "")),
+                reverse=True,
+            )
+        except (OSError, json.JSONDecodeError, TypeError):
+            return []
+
     if nombre:
         query = """
             SELECT nombre, peso::float8 AS peso, fecha::text AS fecha
@@ -107,6 +133,13 @@ def cargar_registros(nombre: str | None = None) -> list[dict[str, Any]]:
 
 
 def guardar_registro(nombre: str, peso: float, fecha: str) -> None:
+    if not USE_POSTGRES:
+        LEGACY_TXT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        nuevo = {"nombre": nombre, "peso": peso, "fecha": fecha}
+        with LEGACY_TXT_FILE.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(nuevo, ensure_ascii=False) + "\n")
+        return
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(

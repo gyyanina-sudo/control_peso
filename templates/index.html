@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
   <body>
-    <h1>Registro de peso</h1>
+    <h2>Registrar Peso</h2>
 
     <form method="post" action="{{ url_for('registrar_peso') }}">
       <label>
@@ -25,10 +25,12 @@
         <input type="date" name="fecha" />
       </label>
 
-      <button type="submit">Guardar registro</button>
+      <button type="submit"> Registrar</button>
     </form>
 
-    <h2>Recuperar registros</h2>
+    <hr>
+
+    <h2>Consultar Peso</h2>
     <form method="get" action="{{ url_for('inicio') }}">
       <label>
         Buscar por nombre
@@ -49,7 +51,8 @@
       {% endif %}
     </p>
 -->
-    <h2>Historial</h2>
+    <hr>
+    <h2>Historial de Peso</h2>
     {% if registros %}
     <table>
       <thead>

@@ -4,3 +4,4 @@ __pycache__/
 venv/
 pesos.json
 registros_peso.txt
+neon.conectionstring.txt
