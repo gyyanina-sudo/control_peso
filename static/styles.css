@@ -11,6 +11,7 @@ form {
   gap: 0.8rem;
   margin-bottom: 1.5rem;
   background-color: bisque;
+  border-radius: 10px;
 }
 
 label {
@@ -28,11 +29,16 @@ button {
 button {
   grid-column: 1 / -1;
   cursor: pointer;
+  border-radius: 10px;
+  background-color: coral;
+  color: white;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  border-radius: 10px;
+  background-color: cadetblue;
 }
 
 th,
