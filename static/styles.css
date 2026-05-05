@@ -4,7 +4,7 @@ body {
   margin: 2rem auto;
   padding: 0 1rem;
   background-image: url('fondo.jpg');
-  background-size: cover;
+  background-size: repeat;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -8,22 +9,44 @@ from typing import Any
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 app = Flask(__name__)
-DATA_FILE = Path("pesos.json")
+BASE_DIR = Path(__file__).resolve().parent
+DATA_FILE = Path(os.getenv("DATA_FILE", BASE_DIR / "registros_peso.txt"))
+LEGACY_JSON_FILE = BASE_DIR / "pesos.json"
 
 
 def cargar_registros() -> list[dict[str, Any]]:
+    if not DATA_FILE.exists() and LEGACY_JSON_FILE.exists():
+        # Migra datos del formato anterior (JSON completo) al nuevo TXT (JSONL).
+        try:
+            legacy = json.loads(LEGACY_JSON_FILE.read_text(encoding="utf-8"))
+            if isinstance(legacy, list):
+                guardar_registros(legacy)
+                return legacy
+        except (json.JSONDecodeError, OSError):
+            return []
+
     if not DATA_FILE.exists():
         return []
+
     try:
-        return json.loads(DATA_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+        registros: list[dict[str, Any]] = []
+        for linea in DATA_FILE.read_text(encoding="utf-8").splitlines():
+            if not linea.strip():
+                continue
+            registro = json.loads(linea)
+            if isinstance(registro, dict):
+                registros.append(registro)
+        return registros
+    except (json.JSONDecodeError, OSError, TypeError):
         return []
 
 
 def guardar_registros(registros: list[dict[str, Any]]) -> None:
-    DATA_FILE.write_text(
-        json.dumps(registros, ensure_ascii=False, indent=2), encoding="utf-8"
+    DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+    contenido = "\n".join(
+        json.dumps(registro, ensure_ascii=False) for registro in registros
     )
+    DATA_FILE.write_text(f"{contenido}\n" if contenido else "", encoding="utf-8")
 
 
 @app.get("/")
