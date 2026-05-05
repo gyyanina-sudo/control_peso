@@ -28,6 +28,26 @@
       <button type="submit">Guardar registro</button>
     </form>
 
+    <h2>Recuperar registros</h2>
+    <form method="get" action="{{ url_for('inicio') }}">
+      <label>
+        Buscar por nombre
+        <input type="text" name="nombre" placeholder="Ej: Ana" value="{{ nombre_busqueda }}" />
+      </label>
+      <button type="submit">Buscar</button>
+    </form>
+
+    <p class="api-links">
+      API completa:
+      <a href="{{ url_for('api_registros') }}">{{ url_for('api_registros') }}</a>
+      {% if nombre_busqueda %}
+      | API por nombre:
+      <a href="{{ url_for('api_registros_por_nombre', nombre=nombre_busqueda) }}"
+        >{{ url_for('api_registros_por_nombre', nombre=nombre_busqueda) }}</a
+      >
+      {% endif %}
+    </p>
+
     <h2>Historial</h2>
     {% if registros %}
     <table>

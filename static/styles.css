@@ -12,6 +12,7 @@ form {
   margin-bottom: 1.5rem;
   background-color: bisque;
   border-radius: 10px;
+  padding: 1rem;
 }
 
 label {
@@ -32,6 +33,7 @@ button {
   border-radius: 10px;
   background-color: coral;
   color: white;
+  border: 0;
 }
 
 table {
@@ -50,4 +52,8 @@ td {
 
 th {
   background: #f3f3f3;
+}
+
+.api-links {
+  margin: 0.75rem 0 1.25rem;
 }

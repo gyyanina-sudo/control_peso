@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 app = Flask(__name__)
 DATA_FILE = Path("pesos.json")
@@ -29,7 +29,22 @@ def guardar_registros(registros: list[dict[str, Any]]) -> None:
 @app.get("/")
 def inicio() -> str:
     registros = cargar_registros()
-    return render_template("index.html", registros=registros)
+    nombre_busqueda = request.args.get("nombre", "").strip()
+
+    if nombre_busqueda:
+        filtrados = [
+            registro
+            for registro in registros
+            if registro.get("nombre", "").strip().lower() == nombre_busqueda.lower()
+        ]
+    else:
+        filtrados = registros
+
+    return render_template(
+        "index.html",
+        registros=filtrados,
+        nombre_busqueda=nombre_busqueda,
+    )
 
 
 @app.post("/registrar")
@@ -61,6 +76,43 @@ def registrar_peso():
     )
     guardar_registros(registros)
     return redirect(url_for("inicio"))
+
+
+@app.get("/api/registros")
+def api_registros():
+    nombre_busqueda = request.args.get("nombre", "").strip()
+    registros = cargar_registros()
+
+    if nombre_busqueda:
+        registros = [
+            registro
+            for registro in registros
+            if registro.get("nombre", "").strip().lower() == nombre_busqueda.lower()
+        ]
+
+    return jsonify(
+        {
+            "total": len(registros),
+            "registros": registros,
+        }
+    )
+
+
+@app.get("/api/registros/<nombre>")
+def api_registros_por_nombre(nombre: str):
+    registros = cargar_registros()
+    filtrados = [
+        registro
+        for registro in registros
+        if registro.get("nombre", "").strip().lower() == nombre.strip().lower()
+    ]
+    return jsonify(
+        {
+            "nombre": nombre,
+            "total": len(filtrados),
+            "registros": filtrados,
+        }
+    )
 
 
 if __name__ == "__main__":
