@@ -10,6 +10,7 @@ form {
   grid-template-columns: repeat(2, minmax(160px, 1fr));
   gap: 0.8rem;
   margin-bottom: 1.5rem;
+  background-color: bisque;
 }
 
 label {
