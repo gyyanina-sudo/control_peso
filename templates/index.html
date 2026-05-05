@@ -4,47 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Registro de Peso</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        max-width: 760px;
-        margin: 2rem auto;
-        padding: 0 1rem;
-      }
-      form {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(160px, 1fr));
-        gap: 0.8rem;
-        margin-bottom: 1.5rem;
-      }
-      label {
-        display: flex;
-        flex-direction: column;
-        font-size: 0.95rem;
-      }
-      input,
-      button {
-        padding: 0.5rem;
-        font-size: 1rem;
-      }
-      button {
-        grid-column: 1 / -1;
-        cursor: pointer;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th,
-      td {
-        border: 1px solid #ddd;
-        padding: 0.6rem;
-        text-align: left;
-      }
-      th {
-        background: #f3f3f3;
-      }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   </head>
   <body>
     <h1>Registro de peso</h1>
