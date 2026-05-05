@@ -154,12 +154,14 @@ def guardar_registro(nombre: str, peso: float, fecha: str) -> None:
 @app.get("/")
 def inicio() -> str:
     nombre_busqueda = request.args.get("nombre", "").strip()
-    filtrados = cargar_registros(nombre_busqueda or None)
+    busqueda_realizada = request.args.get("buscar") == "1"
+    filtrados = cargar_registros(nombre_busqueda or None) if busqueda_realizada else []
 
     return render_template(
         "index.html",
         registros=filtrados,
         nombre_busqueda=nombre_busqueda,
+        busqueda_realizada=busqueda_realizada,
     )
 
 

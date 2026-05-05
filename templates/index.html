@@ -33,6 +33,7 @@
 
     <h2>Consultar Peso</h2>
     <form method="get" action="{{ url_for('inicio') }}">
+      <input type="hidden" name="buscar" value="1" />
       <label>
         Buscar por nombre
         <input type="text" name="nombre" placeholder="Ej: Ana" value="{{ nombre_busqueda }}" />
@@ -52,8 +53,8 @@
       {% endif %}
     </p>
 -->    
-    <h2>Historial</h2>
-    {% if registros %}
+   
+    {% if busqueda_realizada and registros %}
     <table>
       <thead>
         <tr>
@@ -72,8 +73,10 @@
         {% endfor %}
       </tbody>
     </table>
-    {% else %}
+    {% elif busqueda_realizada %}
     <p>No hay registros todavía.</p>
+    {% else %}
+    <p>Realiza una busqueda para ver el historico.</p>
     {% endif %}
     <hr>
   </body>
