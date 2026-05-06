@@ -6,6 +6,7 @@
     <title>Registro de Peso</title>
     <link rel="icon" type="image/x-icon" href="/static/fondo.jpg">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
     <h2>Registrar Peso</h2>
@@ -55,6 +56,10 @@
 -->    
    
     {% if busqueda_realizada and registros %}
+    <div style="max-width: 800px; margin: 20px auto; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <canvas id="graficoPeso"></canvas>
+    </div>
+
     <table>
       <thead>
         <tr>
@@ -79,5 +84,48 @@
     <p>Realiza una busqueda para ver el historico.</p>
     {% endif %}
     <hr>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Obtenemos los registros desde Jinja2 y los convertimos a JSON seguro
+        const registros = {{ registros | tojson | safe }};
+        
+        if (registros && registros.length > 0) {
+          // Ordenamos por fecha de forma ascendente para el gráfico
+          const datosOrdenados = [...registros].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+          
+          const etiquetas = datosOrdenados.map(r => r.fecha);
+          const pesos = datosOrdenados.map(r => r.peso);
+          const nombrePersona = registros[0].nombre;
+
+          const ctx = document.getElementById('graficoPeso').getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: etiquetas,
+              datasets: [{
+                label: `Evolución de Peso: ${nombrePersona} (kg)`,
+                data: pesos,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: false,
+                  title: { display: true, text: 'Peso (kg)' }
+                }
+              }
+            }
+          });
+        }
+      });
+    </script>
   </body>
 </html>
